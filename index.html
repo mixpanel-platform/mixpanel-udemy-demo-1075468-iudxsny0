@@ -5,11 +5,132 @@
     <link rel="stylesheet" type="text/css" href="https://cdn.mxpnl.com/libs/mixpanel-platform/css/reset.css">
     <link rel="stylesheet" type="text/css" href="https://cdn.mxpnl.com/libs/mixpanel-platform/build/mixpanel-platform.v0.latest.min.css">
     <script src="https://cdn.mxpnl.com/libs/mixpanel-platform/build/mixpanel-platform.v0.latest.min.js"></script>
+    <script>
+    
+    var configuration = {
+        start_date: {
+          year: 2016, month: 9, day: 10
+        },
+        end_date: {
+          year: 2016, month: 10, day: 10
+        },
+        initial_step: "Sign Up",
+        secondary_step: "Login",
+        property: ""
+    };
+
+    </script>
+    <style type="text/css">
+    #months ul{ overflow: hidden; }
+    #months li{
+      float: left:; margin-left: 10px; display: block;
+    }
+    </style>
   </head>
   <body class="mixpanel-platform-body">
-    <h1>Hello, World!</h1>
+    <div class="mixpanel-platform-section">
+      <h1>Funnels over time</h1>
+      <div id="months">
+        <ul>
+          
+        </ul>
+      </div>
+      <div id="graph"></div>
+
+    </div>
+    
     <script>
-      // Run queries and display results here
+      var eventGraph  = $('#graph').MPChart({chartType: 'line'});
+      var months = $("#months ul");
+
+      //creating n months
+      var iDate = new Date(configuration.start_date.year, configuration.start_date.month-1, configuration.start_date.day);
+      var fDate = new Date(configuration.end_date.year, configuration.end_date.month-1, configuration.end_date.day);
+      var curDate = iDate;
+      var lastDay, curMonth, li;
+      var all_results = [];
+      var finalObject = {};
+      while(curDate < fDate){
+        
+        lastDay = new Date(curDate.getFullYear(), (curDate.getMonth()+1), 0);
+
+        curMonth = {};
+        
+        if(curDate.getMonth()+1 < 10){
+          curMonth.firstDay = curDate.getFullYear() + "-0" + (curDate.getMonth()+1) + "-01";
+          curMonth.lastDay = lastDay.getFullYear() + "-0" + (lastDay.getMonth()+1) + "-" + lastDay.getDate();
+        }else{
+          curMonth.firstDay = curDate.getFullYear() + "-" + (curDate.getMonth()+1) + "-01";
+          curMonth.lastDay = lastDay.getFullYear() + "-" + (lastDay.getMonth()+1) + "-" + lastDay.getDate();
+        }
+
+        li = "<li data-days='"+lastDay.getDate()+"' data-idate='"+curMonth.firstDay+"' data-fdate='"+curMonth.lastDay+"'>"+curMonth.firstDay+"</li>";
+        months.append(li);
+        curDate = new Date(curDate.getFullYear(), (curDate.getMonth()+1), 1);
+        
+      }
+      
+      //doing the queries
+
+      months.find('li').each(function(i, element){
+        var month = $(element);
+        var confObj = {
+          from: month.data("idate"),
+          to: month.data("fdate"),
+          length: month.data("days"),
+          interval: month.data("days")
+
+        };
+        if(configuration.property != ""){
+          confObj.on = 'properties["'+configuration.property+'"]';
+        }
+        MP.api.funnel(configuration.initial_step, configuration.secondary_step,confObj).done(function(results) {
+            all_results.push({month: month.data("idate"), val: results});
+            if(all_results.length == months.find('li').length){
+              all_requests_done();
+            }
+        });
+
+      });
+
+      function all_requests_done(){
+        //console.log(all_results);
+        var n = all_results.length;
+        var tempObj;
+        for (var i = 0; i < n; i++){
+          tempObj = {};
+          var curObj = all_results[i].val;
+          for (var property in curObj) {
+            if (curObj.hasOwnProperty(property)) {
+              if(property != "$overall"){
+                console.log(curObj);
+                
+                //tempObj[property] = curObj[property][all_results[i].month]["1"].overall_conv_ratio;
+                if(!finalObject.hasOwnProperty(property)){ finalObject[property] = {}; }
+                  if(configuration.property != ""){
+                    finalObject[property][all_results[i].month] = curObj[property][all_results[i].month]["1"].overall_conv_ratio*100;
+                  } else{
+                    if(property == 1){
+                      finalObject[property][all_results[i].month] = curObj[property][all_results[i].month].overall_conv_ratio*100;
+                    }
+                  } 
+                
+
+              }
+            }
+          }
+
+          //finalObject[all_results[i].month] = tempObj;
+
+        }
+
+        eventGraph.MPChart('setData', finalObject);
+        console.log(finalObject);
+      }// function ends
+      
+
+
     </script>
+      
   </body>
 </html>
